@@ -70,5 +70,11 @@ const beginAt = client.indexOf(BEGIN);
 const endAt = client.indexOf(END);
 if (beginAt < 0 || endAt < 0 || endAt < beginAt) throw new Error("drill markers out of order");
 client = client.slice(0, beginAt) + fragment + client.slice(endAt + END.length);
-writeFileSync(clientPath, client);
-console.log("embedded drill client into client.js (" + Buffer.byteLength(fragment) + " bytes fragment)");
+// 只写盘一次，且必须与磁盘现状完全一致才写：避免无意义的 mtime 变化触发
+// 客户端热重载（HMR 轮询 mtime，500ms 一跳），也避免反复构建时来回抖动。
+if (client !== readFileSync(clientPath, "utf8")) {
+	writeFileSync(clientPath, client);
+	console.log("embedded drill client into client.js (" + Buffer.byteLength(fragment) + " bytes fragment)");
+} else {
+	console.log("drill fragment already up to date; client.js unchanged");
+}

@@ -19,14 +19,16 @@ const LEGAL = readFileSync(legalPath, "utf8").trim();
 let client = readFileSync(clientPath, "utf8").replace(/\r\n/g, "\n");
 
 // 1) locale keys
+// 注意：本机已把插件身份改成 dsh-pozhenz（显示名「破阵子」）。这里如果哪天下游重新
+// 跑这个脚本，模板里不能再写回旧的 "dsh-purge"，否则会把改名冲掉。
 if (!client.includes('"dock.clean"')) {
 	client = client.replace(
 		'\t\t\tnav: "规则设定",',
-		`\t\t\tnav: "dsh-purge",
+		`\t\t\tnav: "破阵子",
 			"dock.clean": "清洗",
 			"dock.drill": "演练台",
-			"dock.toggle": "dsh-purge",
-			"dock.newSession": "dsh-purge",
+			"dock.toggle": "破阵子",
+			"dock.newSession": "破阵子",
 			"dock.full": "全面浏览",
 			"dock.close": "收起",
 			"dock.unauthorized": "未授权",
@@ -46,11 +48,11 @@ if (!client.includes('"dock.clean"')) {
 	);
 	client = client.replace(
 		'\t\t\tnav: "Rules",',
-		`\t\t\tnav: "dsh-purge",
+		`\t\t\tnav: "pozhenz",
 			"dock.clean": "Clean",
 			"dock.drill": "Drill",
-			"dock.toggle": "dsh-purge",
-			"dock.newSession": "dsh-purge",
+			"dock.toggle": "pozhenz",
+			"dock.newSession": "pozhenz",
 			"dock.full": "Full view",
 			"dock.close": "Collapse",
 			"dock.unauthorized": "Unauthorized",
@@ -305,7 +307,7 @@ const dockBlock = `
 			return h(react.Fragment, null,
 				h("div", { className: "dshp-dock", "data-open": st.open ? "1" : "0" },
 					h("div", { className: "dshp-dock-head" },
-						h("b", null, "dsh-purge"),
+						h("b", null, "破阵子"),
 						h("span", { style: { flex: 1 } }),
 						st.tab === "drill" && readDrillAuth()
 							? h("button", { type: "button", onClick: () => requestDrill("full") }, t("dock.full"))
@@ -441,8 +443,15 @@ if (client.includes('id: "dsh-purge-dock"')) {
 	throw new Error("apply() block not found for replacement");
 }
 
-writeFileSync(clientPath, client);
-console.log("patched dock/auth into client.js");
+// 只在内容真的变了才写盘：无脑 writeFileSync 会改动 mtime，客户端热重载
+// （dsh-client-hmr 轮询 mtime，500ms 一跳）就会把整个 bundle 重新加载一遍。
+const before = client;
+if (before !== readFileSync(clientPath, "utf8")) {
+	writeFileSync(clientPath, client);
+	console.log("patched dock/auth into client.js");
+} else {
+	console.log("dock/auth already up to date; client.js unchanged");
+}
 
 const built = spawnSync(process.execPath, [join(root, "scripts", "build-client.mjs")], {
 	cwd: root,

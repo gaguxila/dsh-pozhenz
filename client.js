@@ -7414,12 +7414,13 @@ body[data-ds-dark-theme] .rt-scope-testing,.dshp-dock[data-theme="dusk"] .rt-sco
      * 确认后由 host 侧执行 安装 → 重启 dsh web（页面会断开，重启后刷新即可）。
      */
     function VersionBar(props) {
+      /* 本机策略（用户 2026-11-14 指定）：本地插件目录是唯一权威版本。
+         面板不提供「检查更新 / 一键更新」入口，因此这里没有 apply()、没有更新弹窗，
+         也不向宿主发 updateApply —— 后端 lib/redteam/ui.js 同样拒收 updateApply。
+         恢复原行为＝把被删掉的 apply/modal 代码加回来，并改回渲染可点的按钮。 */
       const [info, setInfo] = React.useState(null)
       const [err, setErr] = React.useState(null)
       const [busy, setBusy] = React.useState(false)
-      const [open, setOpen] = React.useState(false)
-      const [msg, setMsg] = React.useState(null)
-      const [countdown, setCountdown] = React.useState(0)
 
       const check = (silent) => {
         if (!silent) setBusy(true)
@@ -7441,29 +7442,9 @@ body[data-ds-dark-theme] .rt-scope-testing,.dshp-dock[data-theme="dusk"] .rt-sco
       }
       React.useEffect(() => { check(true) }, [])
 
-      const apply = () => {
-        setBusy(true)
-        setMsg(null)
-        api({ op: 'updateApply', target: (info && info.latest) || undefined }).then((r) => {
-          setBusy(false)
-          if (!r || r.ok === false) { setMsg({ err: (r && r.error) || '更新失败' }); return }
-          setMsg({ ok: '已安装 ' + (r.installed || '') + '，正在重启当前宿主…' })
-          /* 重启会断开这个页面：倒计时提示用户稍后刷新 */
-          setCountdown(6)
-          const t = setInterval(() => {
-            setCountdown((n) => {
-              if (n <= 1) { clearInterval(t); window.location.reload(); return 0 }
-              return n - 1
-            })
-          }, 1000)
-        }, (e) => { setBusy(false); setMsg({ err: String((e && e.message) || e) }) })
-      }
-
       const current = info && info.current ? info.current : (info && info.plugin ? info.plugin.version : null)
       const latest = info && info.latest ? info.latest : null
       const hasNew = !!(info && info.updateAvailable)
-      const blockers = (info && info.blockers) || []
-      const notes = (info && info.notes) || []
       const mode = info && info.install ? info.install.mode : null
 
       return h('span', { style: { display: 'inline-flex', alignItems: 'center', gap: 6 } },
@@ -7473,48 +7454,11 @@ body[data-ds-dark-theme] .rt-scope-testing,.dshp-dock[data-theme="dusk"] .rt-sco
             + (mode === 'dev' ? '\n安装方式：开发态（源码软链）' : mode === 'package' ? '\n安装方式：包安装' : '')
             + (info && info.check_error ? '\n检查失败：' + info.check_error : '')),
         }, 'v' + (current || '?')),
-        /* 本机策略（用户 2026-11-14 指定）：本地插件目录是唯一权威版本，
-           面板不再提供「检查更新 / 一键更新」入口。恢复原行为＝还原这段三元表达式。 */
         h('span', {
           className: 'rt-tag',
           title: '已按「本地插件目录是唯一权威版本」策略禁用：面板不从 npm / GitHub 拉取覆盖本地。'
             + '要发布本地改动，请手动推送到 GitHub（脚本 C:\\电脑优化\\_pozhenz-20261114\\push-pozhenz.ps1）。',
-        }, '更新已禁用'),
-        open
-          ? h('div', { className: 'rt-modal', 'aria-hidden': 'true', onClick: () => setOpen(false) },
-              h('div', { className: 'rt-modal-box', onClick: (e) => e.stopPropagation() },
-                h('h4', { style: { marginTop: 0 } }, '更新 RedTeam 模式'),
-                h('div', { className: 'rt-kv' }, h('b', null, '当前版本'), h('span', null, current || '未知')),
-                h('div', { className: 'rt-kv' }, h('b', null, '最新版本'), h('span', null, latest || '未知')),
-                h('div', { className: 'rt-kv' }, h('b', null, '安装方式'),
-                  h('span', null, mode === 'dev' ? '开发态（源码软链）' : mode === 'package' ? '包安装（' + ((info.install && info.install.packageManager) || 'npm') + '）' : '未知')),
-                info && info.install && info.install.dir
-                  ? h('div', { className: 'rt-kv' }, h('b', null, '安装位置'), h('span', { className: 'rt-mono' }, info.install.dir))
-                  : null,
-                blockers.length
-                  ? h('div', { className: 'rt-hint' },
-                      h('div', { style: { fontWeight: 600, marginBottom: 4 } }, '现在不能更新：'),
-                      blockers.map((b, i) => h('div', { key: 'b' + i }, '· ' + b)))
-                  : null,
-                notes.length
-                  ? h('div', { className: 'rt-foot', style: { padding: '4px 0' } }, notes.map((n, i) => h('div', { key: 'n' + i }, n)))
-                  : null,
-                h('div', { style: { fontSize: 12, color: 'var(--dsw-alias-label-secondary)', margin: '8px 0' } },
-                  '更新过程：安装新版本 → 自动重启当前宿主（官方 exe / 社区版 / dsh web；当前页面会断开，约 5–10 秒后自动刷新）。'
-                  + '重启前会检查有没有智能体在跑，有就拦住不动。'),
-                msg ? h('div', { className: msg.err ? 'rt-err' : 'rt-foot' }, msg.err || msg.ok) : null,
-                countdown > 0
-                  ? h('div', { className: 'rt-foot' }, '宿主正在重启，' + countdown + ' 秒后自动刷新页面…')
-                  : null,
-                h('div', { style: { display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 10 } },
-                  h('button', { className: 'rt-btn', onClick: () => setOpen(false) }, '关闭'),
-                  h('button', {
-                    className: 'rt-btn rt-btn-primary',
-                    disabled: busy || blockers.length > 0 || mode === 'dev',
-                    title: mode === 'dev' ? '开发态安装请用仓库流程升级' : blockers.length ? '先解决上面的阻塞项' : '安装并重启',
-                    onClick: apply,
-                  }, busy ? '更新中…' : '一键更新并重启'))))
-          : null)
+        }, '更新已禁用'))
     }
 
     /* ---------------------------------------------------------- 常驻面板主体 */
