@@ -269,6 +269,8 @@ window.__ModuleLoader__.load({ id: "dsh-pozhenz", factory: (require) => {
 			"update.pick": "选择版本",
 			"update.tip": "最新",
 			"update.current": "当前",
+			"update.disabled": "已禁用（本地为准）",
+			"update.disabledTip": "已按「本地插件目录是唯一权威版本」策略禁用：面板不再从 GitHub / npm 拉取覆盖本地。要发布本地改动，请手动推送到 GitHub（脚本 C:\\电脑优化\\_pozhenz-20261114\\push-pozhenz.ps1）。",
 			"update.confirmSwitch": "切换到 {version}？之后可再切回另一通道或其它版本。本地未提交的插件改动不会保留。",
 			"update.confirmChannel": "切换到{version}？会按该通道重新安装插件，本地未提交的插件改动不会保留。",
 			"metric.version": "版本",
@@ -627,6 +629,8 @@ window.__ModuleLoader__.load({ id: "dsh-pozhenz", factory: (require) => {
 			"update.pick": "Select version",
 			"update.tip": "latest",
 			"update.current": "current",
+			"update.disabled": "Disabled (local-first)",
+			"update.disabledTip": "Disabled by the local-first policy: this machine's plugin directory is the single authoritative copy, so the panel no longer pulls from GitHub or npm. To publish local changes, push to GitHub manually.",
 			"update.confirmSwitch": "Switch to {version}? You can switch back later. Uncommitted plugin edits will not be kept.",
 			"update.confirmChannel": "Switch to {version}? The plugin will be reinstalled from that channel. Uncommitted plugin edits will not be kept.",
 			"metric.version": "Version",
@@ -2062,6 +2066,13 @@ body[data-ds-dark-theme] .dshp-launch{background:color-mix(in srgb,var(--dsw-ali
 					else if (thisJob.kind === "done") actionLabel = t("btn.doUpdate.busy");
 					else actionLabel = t("update.switching");
 				}
+				/* 本机策略（用户 2026-11-14 指定）：本地插件目录是唯一权威版本。
+				   该卡片上的全部动作（检测更新 / 一键更新 / 切换版本 / 切通道）统一压成禁用态，
+				   只留版本号展示。恢复原行为＝删掉下面这 4 行，并把 select / Btn 的 disabled 改回原表达式。 */
+				actionLabel = t("update.disabled");
+				actionKind = undefined;
+				actionClick = () => {};
+				actionDisabled = true;
 				return h("div", {
 					className: "dshp-edition" + (onLane ? " is-on" : ""),
 					"aria-label": t("channel." + id),
@@ -2073,7 +2084,7 @@ body[data-ds-dark-theme] .dshp-launch{background:color-mix(in srgb,var(--dsw-ali
 					h("select", {
 						className: "dshp-field dshp-ver",
 						value: list.length ? ((hit && hit.ref) || "") : "",
-						disabled: updateBusy || !list.length,
+						disabled: true,
 						onChange: (e) => setPick((prev) => Object.assign({}, prev, { [id]: e.target.value })),
 						"aria-label": t("update.pick"),
 					},
@@ -2084,7 +2095,7 @@ body[data-ds-dark-theme] .dshp-launch{background:color-mix(in srgb,var(--dsw-ali
 							}, versionChoiceLabel(item, t)))
 							: h("option", { value: "" }, noBeta ? t("update.noBeta") : t("update.pick")),
 					),
-					h(Btn, { tiny: true, kind: actionKind, disabled: actionDisabled, onClick: actionClick }, actionLabel),
+					h(Btn, { tiny: true, kind: actionKind, disabled: true, onClick: () => {}, title: t("update.disabledTip") }, actionLabel),
 				);
 			};
 			return h("section", { className: "dshp-panel", "aria-label": t("purge.title") },
@@ -7462,16 +7473,13 @@ body[data-ds-dark-theme] .rt-scope-testing,.dshp-dock[data-theme="dusk"] .rt-sco
             + (mode === 'dev' ? '\n安装方式：开发态（源码软链）' : mode === 'package' ? '\n安装方式：包安装' : '')
             + (info && info.check_error ? '\n检查失败：' + info.check_error : '')),
         }, 'v' + (current || '?')),
-        hasNew
-          ? h('button', {
-              className: 'rt-btn rt-btn-primary', disabled: busy,
-              onClick: () => { setOpen(true); setMsg(null) },
-              title: '发现新版本 ' + latest + '：点击查看并一键更新（会重启当前宿主）',
-            }, busy ? '检查中…' : '有新版本 v' + latest)
-          : h('button', {
-              className: 'rt-btn', disabled: busy, onClick: () => check(false),
-              title: '重新检查 npm 上的最新版本',
-            }, busy ? '检查中…' : '检查更新'),
+        /* 本机策略（用户 2026-11-14 指定）：本地插件目录是唯一权威版本，
+           面板不再提供「检查更新 / 一键更新」入口。恢复原行为＝还原这段三元表达式。 */
+        h('span', {
+          className: 'rt-tag',
+          title: '已按「本地插件目录是唯一权威版本」策略禁用：面板不从 npm / GitHub 拉取覆盖本地。'
+            + '要发布本地改动，请手动推送到 GitHub（脚本 C:\\电脑优化\\_pozhenz-20261114\\push-pozhenz.ps1）。',
+        }, '更新已禁用'),
         open
           ? h('div', { className: 'rt-modal', 'aria-hidden': 'true', onClick: () => setOpen(false) },
               h('div', { className: 'rt-modal-box', onClick: (e) => e.stopPropagation() },
